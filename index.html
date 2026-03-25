@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>内線電話帳</title>
+
+<!-- ホーム画面用のアイコン設定 -->
+<link rel="apple-touch-icon" href="naisen.png">
+<link rel="icon" type="image/png" href="naisen.png">
+
+<!-- モバイルWebアプリ設定 (ホーム画面から起動した際の挙動) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="内線電話帳">
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif; background: #fff; color: #222; max-width: 430px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* Header */
+  .header { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 12px 16px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .header-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .header-icon { width: 36px; height: 36px; object-fit: contain; }
+  .header-title { font-size: 18px; font-weight: 700; color: #1a6fa8; letter-spacing: 0.02em; }
+  .search-box { position: relative; margin-bottom: 10px; }
+  .search-box input { width: 100%; padding: 9px 36px 9px 14px; border: 1.5px solid #d0dce8; border-radius: 10px; font-size: 15px; background: #f4f7fb; outline: none; color: #222; transition: border-color 0.2s; }
+  .search-box input:focus { border-color: #1a6fa8; background: #fff; }
+  .search-box .clear-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #999; font-size: 18px; cursor: pointer; display: none; }
+  .search-box input:not(:placeholder-shown) + .clear-btn { display: block; }
+
+  /* Dept tabs */
+  .dept-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
+  .dept-tabs::-webkit-scrollbar { display: none; }
+  .dept-tab { flex-shrink: 0; padding: 5px 12px; border-radius: 20px; border: 1.5px solid #d0dce8; background: #fff; font-size: 13px; color: #555; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .dept-tab.active { background: #1a6fa8; border-color: #1a6fa8; color: #fff; font-weight: 600; }
+
+  /* Contact list */
+  .contact-list { flex: 1; overflow-y: auto; padding: 0; }
+  .group-header { padding: 6px 16px; background: #f0f4f8; font-size: 12px; color: #888; font-weight: 600; letter-spacing: 0.05em; border-bottom: 1px solid #e8eef4; }
+  .contact-item { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.12s; gap: 12px; }
+  .contact-item:active { background: #e8f0fb; }
+  .contact-avatar { width: 42px; height: 42px; border-radius: 50%; background: #d8eaf8; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .contact-avatar img { width: 28px; height: 28px; object-fit: contain; }
+  .contact-info { flex: 1; min-width: 0; }
+  .contact-name { font-size: 15px; font-weight: 600; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .contact-yomi { font-size: 11px; color: #999; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .contact-meta { text-align: right; flex-shrink: 0; }
+  .contact-dept { font-size: 11px; color: #888; margin-bottom: 3px; }
+  .contact-ext { font-size: 14px; font-weight: 700; color: #1a6fa8; letter-spacing: 0.04em; }
+  .call-btn { width: 38px; height: 38px; border-radius: 50%; background: #1a6fa8; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
+  .call-btn:active { background: #0d4f80; }
+  .call-btn svg { width: 18px; height: 18px; fill: white; }
+
+  /* No results */
+  .no-results { text-align: center; padding: 48px 24px; color: #bbb; }
+  .no-results svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.3; }
+  .no-results p { font-size: 14px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: flex-end; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 430px; margin: 0 auto; padding: 0 0 32px; animation: slideUp 0.25s ease; }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 10px auto 16px; }
+  .modal-icon-wrap { text-align: center; margin-bottom: 12px; }
+  .modal-avatar { width: 64px; height: 64px; border-radius: 50%; background: #d8eaf8; display: inline-flex; align-items: center; justify-content: center; }
+  .modal-avatar img { width: 40px; height: 40px; object-fit: contain; }
+  .modal-name { text-align: center; font-size: 20px; font-weight: 700; color: #1a1a1a; padding: 0 24px; }
+  .modal-yomi { text-align: center; font-size: 13px; color: #999; margin-top: 4px; }
+  .modal-dept { text-align: center; font-size: 13px; color: #1a6fa8; font-weight: 600; margin-top: 6px; }
+  .modal-ext-display { text-align: center; font-size: 32px; font-weight: 800; color: #1a6fa8; letter-spacing: 0.1em; margin: 16px 24px; background: #f0f6ff; border-radius: 14px; padding: 14px 0; }
+  .modal-actions { display: flex; gap: 12px; padding: 0 24px; }
+  .modal-call-btn { flex: 1; background: #1a6fa8; color: white; border: none; border-radius: 14px; padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.15s; }
+  .modal-call-btn:active { background: #0d4f80; }
+  .modal-call-btn svg { width: 20px; height: 20px; fill: white; }
+  .modal-close-btn { background: #f0f0f0; color: #555; border: none; border-radius: 14px; padding: 15px 20px; font-size: 15px; font-weight: 600; cursor: pointer; }
+
+  /* Count badge */
+  .result-count { text-align: right; font-size: 11px; color: #aaa; padding: 4px 16px 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <img class="header-icon" src="naisen.png" alt="Icon">
+    <span class="header-title">社内内線電話帳</span>
+  </div>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="名前・よみがな・内線番号で検索" autocomplete="off">
+    <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕</button>
+  </div>
+  <div class="dept-tabs" id="deptTabs"></div>
+</div>
+
+<div class="result-count" id="resultCount"></div>
+<div class="contact-list" id="contactList"></div>
+
+<!-- Call Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-icon-wrap">
+      <div class="modal-avatar">
+        <img src="naisen.png" alt="Profile">
+      </div>
+    </div>
+    <div class="modal-name" id="modalName"></div>
+    <div class="modal-yomi" id="modalYomi"></div>
+    <div class="modal-dept" id="modalDept"></div>
+    <div class="modal-ext-display" id="modalExt"></div>
+    <div class="modal-actions">
+      <button class="modal-call-btn" id="modalCallBtn">
+        <svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+        発信
+      </button>
+      <button class="modal-close-btn" onclick="closeModalDirect()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CONTACTS = [{"name": "青砥", "yomi": "アオト", "dept": "中国", "ext": "899945"}, {"name": "赤井", "yomi": "アカイ", "dept": "東京", "ext": "810129"}, {"name": "麻西室長", "yomi": "アサニシシツチョウ", "dept": "大阪", "ext": "830351"}, {"name": "朝倉", "yomi": "アサクラ", "dept": "東京", "ext": "810117"}, {"name": "安部T/L", "yomi": "アベ", "dept": "事業", "ext": "899944"}, {"name": "安全･安心ｻﾎﾟｰﾄ(株)", "yomi": "アンゼン･アンシンサポート(株)", "dept": "安全", "ext": "810450"}, {"name": "飯島", "yomi": "イイジマ", "dept": "東京", "ext": "810119"}, {"name": "飯島携帯", "yomi": "イイジマケイタイ", "dept": "東京", "ext": "899968"}, {"name": "池上T/L", "yomi": "イケガミT/L", "dept": "九州", "ext": "850212"}, {"name": "池上T/L携帯", "yomi": "イケガミT/L携帯", "dept": "九州", "ext": "899951"}, {"name": "石田", "yomi": "イシダ", "dept": "中国", "ext": "840309"}, {"name": "石部", "yomi": "イシベ", "dept": "東京", "ext": "810113"}, {"name": "石丸技術課長", "yomi": "イシマルギジュツカチョウ", "dept": "大阪", "ext": "830351"}, {"name": "石丸技術課長携帯", "yomi": "イシマルギジュツカチョウケイタイ", "dept": "大阪", "ext": "899919"}, {"name": "市村ITX工房", "yomi": "イチムラギジュツブチョウケイタイ", "dept": "事業", "ext": "899997"}, {"name": "稲田携帯", "yomi": "イナダケイタイ", "dept": "東京", "ext": "899966"}, {"name": "稲田", "yomi": "イナダ", "dept": "東京", "ext": "810131"}, {"name": "猪俣", "yomi": "イノマタ", "dept": "九州", "ext": "899973"}, {"name": "今西", "yomi": "イマニシ", "dept": "中国", "ext": "899967"}, {"name": "磯田", "yomi": "イソダ", "dept": "中国", "ext": "899943"}, {"name": "岩本課長携帯", "yomi": "イワモトカチョウケイタイ", "dept": "東京", "ext": "899949"}, {"name": "上園主任技師", "yomi": "ウエゾノ", "dept": "東京", "ext": "810125"}, {"name": "上園主任技師携帯", "yomi": "ウエゾノ", "dept": "東京", "ext": "899941"}, {"name": "植松", "yomi": "ウエマツ", "dept": "東京", "ext": "810119"}, {"name": "植本", "yomi": "ウエモト", "dept": "中国", "ext": "840202"}, {"name": "受付", "yomi": "ウケツケ", "dept": "東京", "ext": "810115"}, {"name": "梅津技術課長携帯", "yomi": "ウメズ", "dept": "事業", "ext": "899958"}, {"name": "浦井技術課長", "yomi": "ウメズ", "dept": "大阪", "ext": "830201"}, {"name": "浦井技術課長携帯", "yomi": "ウライギジュツカチョウケイタイ", "dept": "大阪", "ext": "899917"}, {"name": "遠藤", "yomi": "エンドウ", "dept": "東京", "ext": "810131"}, {"name": "遠藤携帯", "yomi": "エンドウケイタイ", "dept": "東京", "ext": "899923"}, {"name": "大木", "yomi": "オオキ", "dept": "中国", "ext": "840201"}, {"name": "大阪C号（角）", "yomi": "オオサカCゴウ（スミ）", "dept": "大阪", "ext": "899938"}, {"name": "大月", "yomi": "オオツキ", "dept": "事業", "ext": "830372"}, {"name": "大月携帯", "yomi": "オオツキケイタイ", "dept": "事業", "ext": "899801"}, {"name": "大宮", "yomi": "オオミヤ", "dept": "九州", "ext": "899988"}, {"name": "大森課長携帯", "yomi": "オオモリカチョウケイタイ", "dept": "中国", "ext": "899946"}, {"name": "掛部長", "yomi": "カブチョウ", "dept": "中部", "ext": "825201"}, {"name": "掛部長携帯", "yomi": "カブチョウケイタイ", "dept": "中部", "ext": "899937"}, {"name": "川本・工房代表", "yomi": "カワモト・コウボウダイヒョウ", "dept": "あさひ", "ext": "899916"}, {"name": "菊井", "yomi": "キクイ", "dept": "総務", "ext": "810103"}, {"name": "菊井携帯", "yomi": "キクイケイタイ", "dept": "総務", "ext": "899924"}, {"name": "菊川技師長", "yomi": "キクカワギシチョウ", "dept": "大阪", "ext": "830223"}, {"name": "菊川技師長携帯", "yomi": "キクカワギシチョウケイタイ", "dept": "大阪", "ext": "899933"}, {"name": "木口", "yomi": "キグチ", "dept": "中部", "ext": "825104"}, {"name": "木口携帯", "yomi": "キグチケイタイ", "dept": "東京", "ext": "899960"}, {"name": "木口携帯", "yomi": "キグチケイタイ", "dept": "東京", "ext": "899960"}, {"name": "岸川本部長携帯", "yomi": "キシカワホンブチョウケイタイ", "dept": "事業", "ext": "899934"}, {"name": "喜多村", "yomi": "キタムラ", "dept": "東京", "ext": "810117"}, {"name": "木村（茉）", "yomi": "キムラ（茉）", "dept": "東京", "ext": "810129"}, {"name": "木村所長携帯", "yomi": "キムラショチョウケイタイ", "dept": "九州", "ext": "899932"}, {"name": "九州３号", "yomi": "キュウシュウ３ゴウ", "dept": "九州", "ext": "899956"}, {"name": "九州防災課フリー", "yomi": "キュウシュウボウサイカフリー", "dept": "九州", "ext": "899991"}, {"name": "熊田主任技師", "yomi": "クマダシュニンギシ", "dept": "中国", "ext": "840307"}, {"name": "熊田主任技師携帯", "yomi": "クマダシュニンギシケイタイ", "dept": "中国", "ext": "899805"}, {"name": "倉本", "yomi": "クラモト", "dept": "大阪", "ext": "830211"}, {"name": "小泉T/L携帯", "yomi": "コイズミT/Lケイタイ", "dept": "東京", "ext": "899998"}, {"name": "小泉TL", "yomi": "コイズミTL", "dept": "東京", "ext": "810116"}, {"name": "小島(康)", "yomi": "コジマ(コウ)", "dept": "九州", "ext": "850217"}, {"name": "小島(志)", "yomi": "コジマ(シ)", "dept": "大阪", "ext": "830221"}, {"name": "近藤（巴）", "yomi": "コンドウ（巴）", "dept": "東京", "ext": "810125"}, {"name": "近藤T/L", "yomi": "コンドウT/L", "dept": "東京", "ext": "810122"}, {"name": "近藤T/L携帯", "yomi": "コンドウT/Lケイタイ", "dept": "東京", "ext": "899929"}, {"name": "齋藤(め)携帯", "yomi": "サイトウ(メ)ケイタイ", "dept": "あさひ", "ext": "899918"}, {"name": "佐藤(暁)課長携帯", "yomi": "サトウ", "dept": "九州", "ext": "899994"}, {"name": "佐藤(暁)課長", "yomi": "サトウ", "dept": "九州", "ext": "850201"}, {"name": "佐藤(翔)", "yomi": "サトウ(ショウ)", "dept": "九州", "ext": "850218"}, {"name": "佐藤(優)G/L携帯", "yomi": "サトウ(ユウ)G/Lケイタイ", "dept": "中部", "ext": "899952"}, {"name": "佐藤(優)G/L", "yomi": "サトウ(ユウ)G/L", "dept": "中部", "ext": "825102"}, {"name": "佐野", "yomi": "サノ", "dept": "九州", "ext": "899215"}, {"name": "佐野携帯", "yomi": "サノケイタイ", "dept": "九州", "ext": "899964"}, {"name": "佐野（太）", "yomi": "サノ（フト）", "dept": "東京", "ext": "810123"}, {"name": "佐良家T/L", "yomi": "サライエ", "dept": "大阪", "ext": "830225"}, {"name": "佐良家T/L携帯", "yomi": "サライエ", "dept": "大阪", "ext": "899931"}, {"name": "澤田室長携帯", "yomi": "サワダシツチョウケイタイ", "dept": "九州", "ext": "899957"}, {"name": "重松", "yomi": "シゲマツ", "dept": "九州", "ext": "850303"}, {"name": "朱", "yomi": "シュ", "dept": "大阪", "ext": "830212"}, {"name": "鮓本課長", "yomi": "スシモトカチョウ", "dept": "九州", "ext": "850211"}, {"name": "鮓本課長携帯", "yomi": "スシモトカチョウケイタイ", "dept": "九州", "ext": "899953"}, {"name": "角", "yomi": "スミ", "dept": "大阪", "ext": "830212"}, {"name": "住広課長", "yomi": "スヒロカチョウ", "dept": "大阪", "ext": "830210"}, {"name": "住広課長携帯", "yomi": "スヒロカチョウケイタイ", "dept": "大阪", "ext": "899939"}, {"name": "関", "yomi": "セキ", "dept": "中国", "ext": "840305"}, {"name": "総務フリー１", "yomi": "ソウムフリー１", "dept": "総務", "ext": "810102"}, {"name": "総務フリー２", "yomi": "ソウムフリー２", "dept": "総務", "ext": "810105"}, {"name": "総務フリー３", "yomi": "ソウムフリー３", "dept": "総務", "ext": "810107"}, {"name": "十川", "yomi": "ソガワ", "dept": "東京", "ext": "810126"}, {"name": "平", "yomi": "タイラ", "dept": "東京", "ext": "810122"}, {"name": "高澤事務課長", "yomi": "タカザワジムカチョウ", "dept": "東京", "ext": "810114"}, {"name": "高須支店長携帯", "yomi": "タカスシテンチョウケイタイ", "dept": "東京", "ext": "899920"}, {"name": "高橋（直）", "yomi": "タカハシ（ナオ）", "dept": "東京", "ext": "810130"}, {"name": "髙橋携帯", "yomi": "タカハシケイタイ", "dept": "東京", "ext": "899977"}, {"name": "髙森", "yomi": "タカモリ", "dept": "大阪", "ext": "830222"}, {"name": "竹下所長", "yomi": "タケシタショチョウ", "dept": "中国", "ext": "840302"}, {"name": "竹下所長携帯", "yomi": "タケシタショチョウケイタイ", "dept": "中国", "ext": "899974"}, {"name": "武田（め）課長", "yomi": "タケダ（メ）カチョウ", "dept": "総務", "ext": "810101"}, {"name": "武田（め）課長携帯", "yomi": "タケダ（メ）カチョウケイタイ", "dept": "総務", "ext": "899981"}, {"name": "立道T/L", "yomi": "タテミチ", "dept": "東京", "ext": "810130"}, {"name": "田中(晋)支店長携帯", "yomi": "タナカ", "dept": "大阪", "ext": "899993"}, {"name": "田中(晋)支店長", "yomi": "タナカ(ススム)シテンチョウ", "dept": "大阪", "ext": "830215"}, {"name": "田中(優)課長携帯", "yomi": "タナカ", "dept": "中国", "ext": "899971"}, {"name": "田邊技術課長", "yomi": "タナベギジュツカチョウ", "dept": "東京", "ext": "810116"}, {"name": "田邊技術課長携帯", "yomi": "タナベギジュツカチョウケイタイ", "dept": "東京", "ext": "899955"}, {"name": "谷口", "yomi": "タニグチ", "dept": "九州", "ext": "850202"}, {"name": "谷本携帯", "yomi": "タニモトケイタイ", "dept": "中国", "ext": "899976"}, {"name": "田根部長携帯", "yomi": "タネブチョウケイタイ", "dept": "東京", "ext": "899927"}, {"name": "為田", "yomi": "タメダ", "dept": "大阪", "ext": "830213"}, {"name": "中国１F会議室", "yomi": "チュウゴク１Fカイギシツ", "dept": "中国", "ext": "840101"}, {"name": "中国２号", "yomi": "チュウゴク２ゴウ", "dept": "中国", "ext": "899942"}, {"name": "土屋工房長携帯", "yomi": "ツチヤ", "dept": "あさひ", "ext": "899992"}, {"name": "東京環境課", "yomi": "トウキョウカンキョウカ", "dept": "東京", "ext": "899922"}, {"name": "徳岡代表携帯", "yomi": "トクオカダイヒョウケイタイ", "dept": "本社", "ext": "899940"}, {"name": "富田部長", "yomi": "トミダブチョウ", "dept": "大阪", "ext": "830200"}, {"name": "富田部長携帯", "yomi": "トミダブチョウケイタイ", "dept": "大阪", "ext": "899947"}, {"name": "富永", "yomi": "トミナガ", "dept": "大阪", "ext": "830214"}, {"name": "富本支店長", "yomi": "トミモトシテンチョウ", "dept": "中国", "ext": "840200"}, {"name": "富本支店長携帯", "yomi": "トミモトシテンチョウケイタイ", "dept": "中国", "ext": "899948"}, {"name": "中島", "yomi": "ナカシマ", "dept": "東京", "ext": "810123"}, {"name": "中村(明)技術課長", "yomi": "ナカムラ(アカ)ギジュツカチョウ", "dept": "東京", "ext": "810116"}, {"name": "中村(明)技術課長携帯", "yomi": "ナカムラ(アカ)ギジュツカチョウケイタイ", "dept": "東京", "ext": "899928"}, {"name": "中村(一)", "yomi": "ナカムラ(イチ)", "dept": "東京", "ext": "810119"}, {"name": "中村（陽）", "yomi": "ナカムラ（ヨウ）", "dept": "東京", "ext": "810111"}, {"name": "西村", "yomi": "ニシムラ", "dept": "東京", "ext": "810123"}, {"name": "西本統括携帯", "yomi": "ニシモトトウカツケイタイ", "dept": "事業", "ext": "899972"}, {"name": "野中課長", "yomi": "ノナカカチョウ", "dept": "東京", "ext": "810125"}, {"name": "野中技術課長携帯", "yomi": "ノナカカチョウ", "dept": "東京", "ext": "899996"}, {"name": "野村(恒)T/L", "yomi": "ノムラ(コウ)T/L", "dept": "大阪", "ext": "830202"}, {"name": "野村(恒)T/L携帯", "yomi": "ノムラ(コウ)T/Lケイタイ", "dept": "大阪", "ext": "899802"}, {"name": "野本", "yomi": "ノモト", "dept": "総務", "ext": "810102"}, {"name": "羽田", "yomi": "ハダ", "dept": "東京", "ext": "810120"}, {"name": "林", "yomi": "ハヤシ", "dept": "東京", "ext": "810112"}, {"name": "原G/L携帯", "yomi": "ハラG/Lケイタイ", "dept": "九州", "ext": "899954"}, {"name": "原G/L", "yomi": "ハラG/L", "dept": "九州", "ext": "850300"}, {"name": "半田G/L", "yomi": "ハンダG/L", "dept": "東京", "ext": "810119"}, {"name": "半田G/L携帯", "yomi": "ハンダG/Lケイタイ", "dept": "東京", "ext": "899995"}, {"name": "廣田G/L携帯", "yomi": "ヒロタG/Lケイタイ", "dept": "中国", "ext": "899976"}, {"name": "プー", "yomi": "プー", "dept": "東京", "ext": "810129"}, {"name": "深尾", "yomi": "フカオ", "dept": "東京", "ext": "810130"}, {"name": "深谷課長", "yomi": "フカヤカチョウ", "dept": "中部", "ext": "825104"}, {"name": "深谷課長（東）", "yomi": "フカヤカチョウ（東）", "dept": "東京", "ext": "810116"}, {"name": "深谷課長携帯", "yomi": "フカヤカチョウケイタイ", "dept": "東京", "ext": "899970"}, {"name": "藤田支店長", "yomi": "フジタシテンチョウ", "dept": "九州", "ext": "850214"}, {"name": "藤田支店長携帯", "yomi": "フジタシテンチョウケイタイ", "dept": "九州", "ext": "899990"}, {"name": "古川G/L・大宮・山口", "yomi": "フルカワG/L・オオミヤ・ヤマグチ", "dept": "九州", "ext": "850300"}, {"name": "古川", "yomi": "フルカワ", "dept": "九州", "ext": "850215"}, {"name": "保澤", "yomi": "ホザワ", "dept": "大阪", "ext": "830202"}, {"name": "保澤携帯", "yomi": "ホザワケイタイ", "dept": "大阪", "ext": "899935"}, {"name": "堀", "yomi": "ホリ", "dept": "大阪", "ext": "830211"}, {"name": "堀携帯", "yomi": "ホリケイタイ", "dept": "大阪", "ext": "899804"}, {"name": "増子", "yomi": "マシコ", "dept": "総務", "ext": "810104"}, {"name": "松岡総務部長携帯", "yomi": "マツオカソウムブチョウケイタイ", "dept": "本社", "ext": "899915"}, {"name": "松岡総務部長", "yomi": "マツオカソウムブチョウ", "dept": "総務", "ext": "810100"}, {"name": "松原", "yomi": "マツバラ", "dept": "東京", "ext": "810125"}, {"name": "松本(力)技術部長携帯", "yomi": "マツモト(チカラ)ギジュツブチョウケイタイ", "dept": "九州", "ext": "899950"}, {"name": "松本(舞)T/L", "yomi": "マツモト(マ)T/L", "dept": "東京", "ext": "810122"}, {"name": "峯技術部長携帯", "yomi": "メネ", "dept": "東京", "ext": "899925"}, {"name": "宮﨑事務課長", "yomi": "ミヤキジムカチョウ", "dept": "九州", "ext": "850213"}, {"name": "宮本", "yomi": "ミヤモト", "dept": "東京", "ext": "810120"}, {"name": "村上", "yomi": "ムラカミ", "dept": "中部", "ext": "825103"}];
+
+const DEPT_COLORS = {
+  '東京': '#4a90d9', '大阪': '#e67e22', '九州': '#27ae60',
+  '中国': '#8e44ad', '中部': '#c0392b', '総務': '#7f8c8d',
+  '事業': '#2980b9', '本社': '#d35400', 'あさひ': '#16a085', '安全': '#c0392b'
+};
+
+let currentDept = 'すべて';
+let searchQuery = '';
+
+function getDepts() {
+  const depts = ['すべて', ...new Set(CONTACTS.map(c => c.dept))];
+  return depts;
+}
+
+function buildDeptTabs() {
+  const tabs = document.getElementById('deptTabs');
+  getDepts().forEach(dept => {
+    const btn = document.createElement('button');
+    btn.className = 'dept-tab' + (dept === currentDept ? ' active' : '');
+    btn.textContent = dept;
+    btn.onclick = () => {
+      currentDept = dept;
+      document.querySelectorAll('.dept-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      renderList();
+    };
+    tabs.appendChild(btn);
+  });
+}
+
+function getFiltered() {
+  let list = CONTACTS;
+  if (currentDept !== 'すべて') list = list.filter(c => c.dept === currentDept);
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.yomi.toLowerCase().includes(q) ||
+      c.ext.includes(q)
+    );
+  }
+  return list;
+}
+
+function getYomiGroup(yomi) {
+  const first = yomi.charAt(0);
+  const groups = ['ア行','カ行','サ行','タ行','ナ行','ハ行','マ行','ヤ行','ラ行','ワ行'];
+  const starts = [
+    ['ア','イ','ウ','エ','オ'],
+    ['カ','キ','ク','ケ','コ','ガ','ギ','グ','ゲ','ゴ'],
+    ['サ','シ','ス','セ','ソ','ザ','ジ','ズ','ゼ','ゾ'],
+    ['タ','チ','ツ','テ','ト','ダ','ヂ','ヅ','デ','ド'],
+    ['ナ','ニ','ヌ','ネ','ノ'],
+    ['ハ','ヒ','フ','ヘ','ホ','バ','ビ','ブ','ベ','ボ','パ','ピ','プ','ペ','ポ'],
+    ['マ','ミ','ム','メ','モ'],
+    ['ヤ','ユ','ヨ'],
+    ['ラ','リ','ル','レ','ロ'],
+    ['ワ','ヲ','ン']
+  ];
+  for (let i = 0; i < starts.length; i++) {
+    if (starts[i].includes(first)) return groups[i];
+  }
+  return 'その他';
+}
+
+function renderList() {
+  const list = getFiltered();
+  const container = document.getElementById('contactList');
+  const countEl = document.getElementById('resultCount');
+  countEl.textContent = list.length + '件';
+  container.innerHTML = '';
+
+  if (list.length === 0) {
+    container.innerHTML = `<div class="no-results">
+      <svg viewBox="0 0 24 24"><path fill="#ccc" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <p>該当する連絡先が見つかりません</p>
+    </div>`;
+    return;
+  }
+
+  const showGroups = !searchQuery && currentDept === 'すべて';
+  let grouped = {};
+  if (showGroups) {
+    list.forEach(c => {
+      const g = getYomiGroup(c.yomi);
+      if (!grouped[g]) grouped[g] = [];
+      grouped[g].push(c);
+    });
+  } else {
+    grouped[''] = list;
+  }
+
+  Object.entries(grouped).forEach(([group, contacts]) => {
+    if (group) {
+      const gh = document.createElement('div');
+      gh.className = 'group-header';
+      gh.textContent = group;
+      container.appendChild(gh);
+    }
+    contacts.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'contact-item';
+      item.innerHTML = `
+        <div class="contact-avatar" style="background:${(DEPT_COLORS[c.dept] || '#4a90d9') + '22'}">
+          <img src="naisen.png" alt="Avatar" style="opacity:0.8; filter:drop-shadow(0 0 1px ${DEPT_COLORS[c.dept] || '#4a90d9'});">
+        </div>
+        <div class="contact-info">
+          <div class="contact-name">${c.name}</div>
+          <div class="contact-yomi">${c.yomi}</div>
+        </div>
+        <div class="contact-meta">
+          <div class="contact-dept">${c.dept}</div>
+          <div class="contact-ext">${c.ext}</div>
+        </div>
+        <button class="call-btn" onclick="event.stopPropagation(); openModal(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+          <svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+        </button>
+      `;
+      item.onclick = () => openModal(c);
+      container.appendChild(item);
+    });
+  });
+}
+
+function openModal(c) {
+  document.getElementById('modalName').textContent = c.name;
+  document.getElementById('modalYomi').textContent = c.yomi;
+  document.getElementById('modalDept').textContent = '【' + c.dept + '】';
+  document.getElementById('modalExt').textContent = c.ext;
+  document.getElementById('modalCallBtn').onclick = () => window.location.href = 'tel:' + c.ext;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModalDirect();
+}
+function closeModalDirect() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  searchQuery = '';
+  renderList();
+}
+
+document.getElementById('searchInput').addEventListener('input', function() {
+  searchQuery = this.value;
+  renderList();
+});
+
+buildDeptTabs();
+renderList();
+</script>
+</body>
+</html>
