@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "GeoPhoto",
+    "slug": "geophoto",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#1a1a2e"
+    },
+    "ios": {
+      "bundleIdentifier": "com.yourco.geophoto",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "撮影した写真をGPS情報付きで保存するために使用します。",
+        "NSPhotoLibraryAddUsageDescription": "撮影した写真をGeoPhotoアルバムに保存するために使用します。",
+        "NSPhotoLibraryUsageDescription": "保存済みの写真を読み込むために使用します。",
+        "NSLocationWhenInUseUsageDescription": "写真のEXIF情報にGPS情報がない場合の位置情報取得に使用します。"
+      }
+    },
+    "android": {
+      "package": "com.yourco.geophoto",
+      "adaptiveIcon": {
+        "backgroundColor": "#1a1a2e"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "撮影した写真をGPS情報付きで保存するために使用します。"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "保存済みの写真を読み込むために使用します。",
+          "savePhotosPermission": "撮影した写真をGeoPhotoアルバムに保存するために使用します。",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "写真のEXIF情報にGPS情報がない場合の位置情報取得に使用します。"
+        }
+      ]
+    ]
+  }
+}
